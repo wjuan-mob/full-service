@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import List, Tuple
 import http.client
 import json
 import time
@@ -211,15 +212,18 @@ class Client:
         })
         return r['address_map']
 
-    def _build_and_submit_transaction(self, account_id, amount, to_address):
-        amount = str(mob2pmob(amount))
+    def _build_and_submit_transactions(self, account_id, addresses_and_amounts: List[Tuple[str, str]]):
         r = self._req({
             "method": "build_and_submit_transaction",
             "params": {
                 "account_id": account_id,
-                "addresses_and_values": [(to_address, amount)],
+                "addresses_and_values": addresses_and_amounts,
             }
         })
+        return r
+
+    def _build_and_submit_transaction(self, account_id, amount, to_address):
+        r = self._build_and_submit_transactions(account_id, addresses_and_amounts=[(to_address, str(mob2pmob(amount)))])
         return r
 
     def build_and_submit_transaction(self, account_id, amount, to_address):
@@ -229,6 +233,10 @@ class Client:
     def build_and_submit_transaction_with_proposal(self, account_id, amount, to_address):
         r = self._build_and_submit_transaction(account_id, amount, to_address)
         return r['transaction_log'], r['tx_proposal']
+
+    def split_txos(self, account_id, split_size_mob: Decimal = 0.1, num_splits: int = 10):
+        main_address = self.get_account(account_id)['main_address']
+        return self._build_and_submit_transactions(account_id, [(main_address, str(mob2pmob(split_size_mob))) for _ in range(num_splits)])
 
     def build_transaction(self, account_id, amount, to_address, tombstone_block=None):
         amount = str(mob2pmob(amount))
@@ -262,6 +270,12 @@ class Client:
             },
         })
         return r['transaction_log_map']
+
+    def get_all_unspent_txos_for_account(self, account_id):
+        txo_map = self.get_all_txos_for_account(account_id)
+        for txo_id, txo in txo_map.items():
+            if txo['received_block_index'] is not None and txo['spent_block_index'] is None:
+                yield txo_id
 
     def create_receiver_receipts(self, tx_proposal):
         r = self._req({
@@ -381,7 +395,6 @@ class Client:
             time.sleep(1)
         else:
             raise Exception('Txo {} never landed.'.format(txo_id))
-
 
 
 PMOB = Decimal("1e12")

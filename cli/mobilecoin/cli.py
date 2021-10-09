@@ -402,9 +402,7 @@ class CommandLineInterface:
                 return finalized
             else:
                 return None
-
         transactions = sorted(transactions.values(), key=block_key)
-
         for t in transactions:
             print()
             if t['direction'] == 'tx_direction_received':
@@ -414,10 +412,13 @@ class CommandLineInterface:
                         for txo in t['output_txos']
                     )
                 )
+                txo_ids = [txo['txo_id_hex'] for txo in t['output_txos']]
+                print(f"TXO ID(s): {' '.join(txo_ids)}")
                 print('Received {}'.format(amount))
                 print('  at {}'.format(t['assigned_address_id']))
             elif t['direction'] == 'tx_direction_sent':
                 for txo in t['output_txos']:
+                    print(f"TXO ID(s): {txo['txo_id_hex']}")
                     amount = _format_mob(pmob2mob(txo['value_pmob']))
                     print('Sent {}'.format(amount))
                     if not txo['recipient_address_id']:
@@ -496,6 +497,7 @@ class CommandLineInterface:
             print('Cancelled.')
             return
 
+        print(f"Sending to account id {account_id}, amount {amount}, to_address: {to_address}")
         transaction_log, tx_proposal = self.client.build_and_submit_transaction_with_proposal(account_id, amount, to_address)
 
         print('Sent {}, with a transaction fee of {}'.format(
