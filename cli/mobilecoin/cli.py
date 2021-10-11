@@ -106,6 +106,10 @@ class CommandLineInterface:
         self.history_args = command_sp.add_parser('history', help='Show account transaction history.')
         self.history_args.add_argument('account_id', help='Account ID.')
 
+        # Show unspent txo's
+        self.unspent_args = command_sp.add_parser('unspent', help='Show unspent txos.')
+        self.unspent_args.add_argument('account_id', help='Account ID.')
+
         # Send transaction.
         self.send_args = command_sp.add_parser('send', help='Send a transaction.')
         self.send_args.add_argument('--build-only', action='store_true', help='Just build the transaction, do not submit it.')
@@ -113,6 +117,13 @@ class CommandLineInterface:
         self.send_args.add_argument('account_id', help='Source account ID.')
         self.send_args.add_argument('amount', help='Amount of MOB to send.')
         self.send_args.add_argument('to_address', help='Address to send to.')
+
+        # Split transactions.
+        self.split_args = command_sp.add_parser('split', help='Split your MOB.')
+        self.split_args.add_argument('account_id', help='Source account ID.')
+        self.split_args.add_argument('amount', type=Decimal, help='Amount of MOB for splits')
+        self.split_args.add_argument('num_splits', type=int, help='Number of splits')
+
 
         # Submit transaction proposal.
         self.submit_args = command_sp.add_parser('submit', help='Submit a transaction proposal.')
@@ -709,6 +720,28 @@ class CommandLineInterface:
             if 'GiftCodeNotFound' in e.response['data']['server_error']:
                 print('Gift code not found; nothing to remove.')
                 return
+
+    def unspent(self, account_id):
+        account = self._load_account_prefix(account_id)
+        account_id = account['account_id']
+        unspent = self.client.get_all_unspent_txos_for_account(account_id)
+        for txo_id, amt_mob in unspent:
+            print(f"Unspent TXO: {txo_id} :{amt_mob} MOB")
+            print()
+
+    def split(self, account_id, amount, num_splits):
+        account = self._load_account_prefix(account_id)
+        account_id = account['account_id']
+        main_address = account['main_address']
+        temp_account = self.client.create_account('temp_acct_split')
+        temp_account_id = temp_account['account_id']
+        temp_address_split = temp_account['main_address']
+        print(f'Splitting {num_splits} TXOs from {account_id} to {temp_address_split}')
+        list(self.client.split_txos(account_id, to_acc=temp_address_split, split_size_mob=Decimal(amount), num_splits=num_splits))
+        print(f'Splitting {num_splits} TXOs from {temp_account_id} to {main_address}')
+        list(self.client.split_txos(temp_account_id, to_acc=main_address, split_size_mob=Decimal(amount), num_splits=num_splits))
+        print(f'Sending remaining mob')
+        self.send(temp_account_id, 'all', main_address)
 
 
 def _format_mob(mob):

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 import http.client
 import json
 import time
@@ -9,10 +9,18 @@ DEFAULT_URL = 'http://127.0.0.1:9090/wallet'
 
 MAX_TOMBSTONE_BLOCKS = 100
 
+MAX_FRAGMENTATION = 16
+
+SLEEP_TIME = 10
+
 
 class WalletAPIError(Exception):
     def __init__(self, response):
         self.response = response
+
+
+def chunker_list(seq, size):
+    return (seq[i::size] for i in range(size))
 
 
 class Client:
@@ -212,31 +220,42 @@ class Client:
         })
         return r['address_map']
 
-    def _build_and_submit_transactions(self, account_id, addresses_and_amounts: List[Tuple[str, str]]):
-        r = self._req({
+    def _build_and_submit_transactions(self, account_id, addresses_and_amounts: List[Tuple[str, str]], params: Optional[Dict] = None):
+        request = {
             "method": "build_and_submit_transaction",
             "params": {
                 "account_id": account_id,
                 "addresses_and_values": addresses_and_amounts,
             }
-        })
+        }
+        if params:
+            request['params'].update(params)
+        r = self._req(request)
         return r
 
-    def _build_and_submit_transaction(self, account_id, amount, to_address):
-        r = self._build_and_submit_transactions(account_id, addresses_and_amounts=[(to_address, str(mob2pmob(amount)))])
+    def build_and_submit_transactions(self, account_id, addresses_and_amounts: Dict[str, List[Decimal]]):
+        flattened = [(address, amount) for address, amount in [[(address, str(amount)) for amount in addresses_and_amounts[address]] for address in addresses_and_amounts]]
+        r = self._build_and_submit_transactions(account_id, flattened)
         return r
 
     def build_and_submit_transaction(self, account_id, amount, to_address):
-        r = self._build_and_submit_transaction(account_id, amount, to_address)
+        r = self._build_and_submit_transactions(account_id, addresses_and_amounts=[(to_address, str(mob2pmob(amount)))])
         return r['transaction_log']
 
     def build_and_submit_transaction_with_proposal(self, account_id, amount, to_address):
-        r = self._build_and_submit_transaction(account_id, amount, to_address)
+        r = self._build_and_submit_transactions(account_id, addresses_and_amounts=[(to_address, str(mob2pmob(amount)))])
         return r['transaction_log'], r['tx_proposal']
 
-    def split_txos(self, account_id, split_size_mob: Decimal = 0.1, num_splits: int = 10):
-        main_address = self.get_account(account_id)['main_address']
-        return self._build_and_submit_transactions(account_id, [(main_address, str(mob2pmob(split_size_mob))) for _ in range(num_splits)])
+    def build_and_submit_transaction_with_proposal_and_input_txos(self, account_id, amount, to_address, input_txos: List[str]):
+        r = self._build_and_submit_transactions(account_id,
+                                                addresses_and_amounts=[(to_address, str(mob2pmob(amount)))],
+                                                params={'input_txo_ids':input_txos})
+        return r['transaction_log'], r['tx_proposal']
+
+    def split_txos(self, account_id, to_acc, split_size_mob: Decimal = 0.1, num_splits: int = 10):
+        for split in chunker_list(range(num_splits), MAX_FRAGMENTATION):
+            time.sleep(SLEEP_TIME)
+            yield self._build_and_submit_transactions(account_id, [(to_acc, str(mob2pmob(split_size_mob))) for _ in split])
 
     def build_transaction(self, account_id, amount, to_address, tombstone_block=None):
         amount = str(mob2pmob(amount))
@@ -275,7 +294,8 @@ class Client:
         txo_map = self.get_all_txos_for_account(account_id)
         for txo_id, txo in txo_map.items():
             if txo['received_block_index'] is not None and txo['spent_block_index'] is None:
-                yield txo_id
+                txo = self.get_txo(txo_id)
+                yield txo_id, pmob2mob(txo['value_pmob'])
 
     def create_receiver_receipts(self, tx_proposal):
         r = self._req({
