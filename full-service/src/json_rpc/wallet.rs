@@ -78,7 +78,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for ApiKeyGuard {
     type Error = ApiKeyError;
 
     fn from_request(req: &'a Request<'r>) -> Outcome<Self, (rocket::http::Status, Self::Error), ()> {
-        println!("Tested from_request.");
         let client_key = req.headers().get_one(API_KEY_HEADER).unwrap_or_default();
         let local_key = std::env::var("MC_API_KEY").unwrap_or_default();
         if local_key == client_key { 
