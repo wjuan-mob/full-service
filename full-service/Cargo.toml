@@ -38,6 +38,8 @@ mc-util-from-random = { path = "../mobilecoin/util/from-random" }
 mc-util-serial = { path = "../mobilecoin/util/serial", default-features = false }
 mc-util-uri = { path = "../mobilecoin/util/uri" }
 
+validator-ledger-service = { path = "../validator-service"}
+
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 crossbeam-channel = "0.4"
 diesel = { version = "1.4.6", features = ["sqlcipher-bundled"] }

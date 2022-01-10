@@ -119,6 +119,9 @@ pub struct APIConfig {
     /// transactions to fog recipients).
     #[structopt(long, parse(try_from_str=load_css_file))]
     pub fog_ingest_enclave_css: Option<Signature>,
+
+    #[structopt(long)]
+    pub blockchain_listen_uri: ConsensusClientUri,
 }
 
 fn parse_duration_in_seconds(src: &str) -> Result<Duration, std::num::ParseIntError> {

@@ -4,7 +4,9 @@ use grpcio::{Server as GrpcioServer, ServerBuilder};
 use mc_common::logger::{log, Logger};
 use mc_consensus_api::consensus_common_grpc;
 use mc_ledger_db::LedgerDB;
-use mc_util_grpc::{AnonymousAuthenticator, Authenticator};
+use mc_util_grpc::{AnonymousAuthenticator, Authenticator, ConnectionUriGrpcioServer};
+use mc_util_uri::ConsensusClientUri;
+
 use std::sync::Arc;
 
 const NETWORK: &str = "test";
@@ -16,7 +18,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(ledger_db: LedgerDB, logger: Logger) -> Self {
+    pub fn new(
+        client_listen_uri: &ConsensusClientUri,
+        ledger_db: LedgerDB,
+        logger: Logger,
+    ) -> Self {
         //TODO update name
         log::info!(logger, "starting, network = {}", NETWORK);
 
@@ -36,7 +42,10 @@ impl Server {
                 Some(0),
             ));
 
-        let server_builder = ServerBuilder::new(env).register_service(blockchain_service);
+        let server_builder = ServerBuilder::new(env)
+            .register_service(blockchain_service)
+            .bind_using_uri(client_listen_uri, logger.clone());
+
         log::info!(logger, "Registered service");
 
         let server = server_builder.build().unwrap();

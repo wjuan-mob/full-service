@@ -2263,6 +2263,7 @@ dependencies = [
  "tempdir",
  "tiny-bip39",
  "uuid 0.7.4",
+ "validator-ledger-service",
 ]
 
 [[package]]

@@ -19,6 +19,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 use structopt::StructOpt;
+use validator_server::Server;
 
 #[allow(unused_imports)] // Needed for embedded_migrations!
 #[macro_use]
@@ -142,15 +143,24 @@ fn main() {
     let state = WalletState {
         service: WalletService::new(
             wallet_db,
-            ledger_db,
+            ledger_db.clone(),
             peer_manager,
             network_state,
             config.get_fog_resolver_factory(logger.clone()),
             config.num_workers,
             config.offline,
-            logger,
+            logger.clone(),
         ),
     };
+
+    let mut server = Server::new(
+        &config.blockchain_listen_uri,
+        ledger_db.clone(),
+        logger.clone(),
+    );
+    log::info!(logger, "Build server");
+    server.start();
+    log::info!(logger, "Started server");
 
     let rocket = rocket(rocket_config, state);
 
