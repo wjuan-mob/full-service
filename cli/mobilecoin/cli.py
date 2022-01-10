@@ -219,7 +219,7 @@ class CommandLineInterface:
                 wallet_server_command += ['--peer', peer]
             for tx_source_url in self.config['tx-source-url']:
                 wallet_server_command += ['--tx-source-url', tx_source_url]
-
+        wallet_server_command += ['--blockchain-listen-uri', self.config['blockchain-listen-uri']]
         ingest_enclave = self.config.get('fog-ingest-enclave-css')
         if ingest_enclave:
             wallet_server_command += ['--fog-ingest-enclave-css', ingest_enclave]
