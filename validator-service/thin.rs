@@ -3,14 +3,14 @@
 //! Connection implementations required for the Thin client.
 //! The unattested client implementation.
 
-use cookie::CookieJar;
+use cookie::{Cookie, CookieJar, ParseError};
 use displaydoc::Display;
-use grpcio::{CallOption, ChannelBuilder, Environment, Error as GrpcError, MetadataBuilder};
+use grpcio::{CallOption, ChannelBuilder, Environment, Error as GrpcError, MetadataBuilder, Metadata};
 use mc_common::{
     logger::{log, o, Logger},
     trace_time,
 };
-use mc_connection::{
+use mc_connection::{AttestationError,
     AuthenticationError, CredentialsProvider, CredentialsProviderError,
     Error, Result,
     BlockInfo, BlockchainConnection, Connection,
@@ -19,7 +19,7 @@ use mc_consensus_api::{
     consensus_common::BlocksRequest, consensus_common_grpc::BlockchainApiClient, empty::Empty,
 };
 use mc_transaction_core::{Block, BlockID, BlockIndex};
-use mc_util_grpc::{ConnectionUriGrpcioChannel, GrpcCookieStore};
+use mc_util_grpc::{ConnectionUriGrpcioChannel};
 use mc_util_uri::{ConnectionUri, ConsensusClientUri as ClientUri, UriConversionError};
 use std::{
     cmp::Ordering,
@@ -29,6 +29,8 @@ use std::{
     ops::Range,
     result::Result as StdResult,
     sync::Arc,
+    string::FromUtf8Error,
+
 };
 /// Attestation failures a thick client can generate
 #[derive(Debug, Display)]
@@ -74,6 +76,8 @@ impl AuthenticationError for ThinClientError {
         }
     }
 }
+
+impl AttestationError for ThinClientError {}
 
 /// A connection from a client to a consensus enclave.
 pub struct ThinClient<CP: CredentialsProvider> {
@@ -328,5 +332,71 @@ impl<CP: CredentialsProvider> Ord for ThinClient<CP> {
 impl<CP: CredentialsProvider> PartialOrd for ThinClient<CP> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.uri.addr().partial_cmp(&other.uri.addr())
+    }
+}
+
+fn append_to_cookies(dest: &mut Vec<Cookie>, src: Option<&Metadata>) -> Result<()> {
+    if let Some(metadata) = src {
+        for (name, value) in metadata {
+            if name.eq_ignore_ascii_case("set-cookie") {
+                let stringvalue = String::from_utf8(value.to_vec())?;
+                dest.push(Cookie::parse(stringvalue)?);
+            }
+        }
+    }
+    Ok(())
+}
+
+impl From<ParseError> for Error {
+    fn from(src: ParseError) -> Error {
+        Error::Parse(src)
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(src: FromUtf8Error) -> Error {
+        Error::Utf8(src)
+    }
+}
+/// A trait used to monkey-patch helper methods onto the `cookie::CookieJar`
+/// type.
+pub trait GrpcCookieStore {
+    /// Search metadata received from a server and treat any `Set-Cookie` values
+    /// appropriately.
+    fn update_from_server_metadata(
+        &mut self,
+        headers: Option<&Metadata>,
+        trailers: Option<&Metadata>,
+    ) -> Result<()>;
+
+    /// Copy the contents of this CookieJar into a Metadata structure containing
+    /// any `Cookie` headers to send to a server.
+    fn to_client_metadata(&self) -> Result<MetadataBuilder>;
+}
+
+impl GrpcCookieStore for CookieJar {
+    fn update_from_server_metadata(
+        &mut self,
+        header: Option<&Metadata>,
+        trailer: Option<&Metadata>,
+    ) -> Result<()> {
+        let mut cookies = Vec::new();
+        append_to_cookies(&mut cookies, header)?;
+        append_to_cookies(&mut cookies, trailer)?;
+
+        for cookie in cookies {
+            self.add(cookie);
+        }
+        Ok(())
+    }
+
+    fn to_client_metadata(&self) -> Result<MetadataBuilder> {
+        let mut builder = MetadataBuilder::new();
+
+        for cookie in self.iter() {
+            builder.add_str("Cookie", cookie.to_string().as_str())?;
+        }
+
+        Ok(builder)
     }
 }
