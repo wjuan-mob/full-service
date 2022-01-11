@@ -11,9 +11,9 @@ use mc_common::{
     trace_time,
 };
 use mc_connection::{
-    credentials::{AuthenticationError, CredentialsProvider, CredentialsProviderError},
-    error::{Error, Result},
-    traits::{BlockInfo, BlockchainConnection, Connection},
+    AuthenticationError, CredentialsProvider, CredentialsProviderError,
+    Error, Result,
+    BlockInfo, BlockchainConnection, Connection,
 };
 use mc_consensus_api::{
     consensus_common::BlocksRequest, consensus_common_grpc::BlockchainApiClient, empty::Empty,
