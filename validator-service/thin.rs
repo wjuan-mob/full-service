@@ -29,8 +29,6 @@ use std::{
     ops::Range,
     result::Result as StdResult,
     sync::Arc,
-    string::FromUtf8Error,
-
 };
 /// Attestation failures a thick client can generate
 #[derive(Debug, Display)]
