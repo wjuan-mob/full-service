@@ -25,7 +25,7 @@ mc-util-metrics = { path = "../mobilecoin/util/metrics" }
 mc-util-uri = { path = "../mobilecoin/util/uri" }
 
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
-cookie = "0.16"
+cookie = "0.14"
 displaydoc = { version = "0.2", default-features = false }
 dotenv = "0.15.0"
 futures = "0.3"
