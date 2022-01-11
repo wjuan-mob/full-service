@@ -9,6 +9,11 @@ license = "GPL-3.0"
 name = "validator_server"
 path = "lib.rs"
 
+
+[[bin]]
+name = "test_client"
+path = "test_client.rs"
+
 [dependencies]
 mc-common = { path = "../mobilecoin/common", default-features = false, features = ["loggers"] }
 mc-consensus-api = { path = "../mobilecoin/consensus/api" }
