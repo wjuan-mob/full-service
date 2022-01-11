@@ -34,13 +34,9 @@ impl Server {
         // Authenticator
         let client_authenticator: Arc<dyn Authenticator + Sync + Send> =
             Arc::new(AnonymousAuthenticator::default());
-        let blockchain_service =
-            consensus_common_grpc::create_blockchain_api(BlockchainApiService::new(
-                ledger_db.clone(),
-                client_authenticator.clone(),
-                logger.clone(),
-                Some(0),
-            ));
+        let blockchain_service = consensus_common_grpc::create_blockchain_api(
+            BlockchainApiService::new(ledger_db, client_authenticator, logger.clone(), Some(0)),
+        );
 
         let server_builder = ServerBuilder::new(env)
             .register_service(blockchain_service)
