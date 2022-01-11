@@ -1,7 +1,4 @@
-use std::{
-    env,
-    sync::{Arc},
-};
+use std::{env, sync::Arc};
 
 use grpcio::{CallOption, ChannelBuilder, EnvBuilder};
 use mc_common::logger;
